@@ -5,7 +5,7 @@ describe('merged', () => {
     const Foo = unionize({
       x: ofType<{ n: number }>(),
       y: ofType<{ s: string }>(),
-    })
+    }, {tagProp: 'tag'})
 
     let foo: typeof Foo._Union
 
@@ -61,7 +61,7 @@ describe('merged', () => {
       it('avoidable', () => {
         const T = unionize({
           foo: ofType<{ x: number }>(),
-        }, 'conflict')
+        }, { tagProp:'conflict' })
         const input = { x: 42, conflict: 'oops' }
         expect(T.foo(input).conflict).toBe('foo')
       })
@@ -73,7 +73,7 @@ describe('separate', () => {
   const Foo = unionize({
     x: ofType<number>(),
     y: ofType<string>(),
-  }, 'flim', 'flam')
+  }, { tagProp:'flim', valProp:'flam' })
 
   let foo: typeof Foo._Union
 
@@ -128,7 +128,7 @@ describe('separate', () => {
       x: ofType<number>(),
       y: ofType<string>(),
       z: ofType<boolean>(),
-    }, 'blum', 'blam')
+    }, {tagProp:'blum', valProp:'blam'})
 
     const bar = Foo.match(Bar)(foo)
     expect(bar.blum).toBe('x')

@@ -55,23 +55,23 @@ export type DictRecord = { [tag: string]: { [field: string]: any }} & {default?:
  *
  * @param record A record mapping tags to value types. The actual values of the record don't
  * matter; they're just used in the types of the resulting tagged union. See `ofType`.
- * @param tagProp An optional custom name for the tag property of the union.
- * @param valProp An optional custom name for the value property of the union. If not specified,
+ * @param config An optional config object. By default tag='tag' and payload is merged into object itself 
+ * @param config.tagProp An optional custom name for the tag property of the union.
+ * @param config.valProp An optional custom name for the value property of the union. If not specified,
  * the value must be a dictionary type.
  */
-export function unionize<Record extends DictRecord>(
-  record: Record
-): Unionized<Record, MultiValueVariants<Record, 'tag'>>
-export function unionize<Record extends DictRecord, TagProp extends string>(
+export function unionize<Record, ValProp extends string, TagProp extends string = 'tag'>(
   record: Record,
-  tagProp: TagProp,
-): Unionized<Record, MultiValueVariants<Record, TagProp>>
-export function unionize<Record, TagProp extends string, ValProp extends string>(
-  record: Record,
-  tagProp: TagProp,
-  valProp: ValProp,
+  config: { valProp: ValProp, tagProp? : TagProp }
 ): Unionized<Record, SingleValueVariants<Record, TagProp, ValProp>>
-export function unionize<Record>(record: Record, tagProp = 'tag', valProp?: string) {
+export function unionize<Record extends DictRecord, TagProp extends string = 'tag'>(
+  record: Record,
+  config?: {tagProp: TagProp},
+): Unionized<Record, MultiValueVariants<Record, TagProp>>
+export function unionize<Record>(record: Record, config?: { valProp?: string, tagProp? : string } ) {
+  const tagProp = config && config.tagProp || 'tag';
+  const valProp = config && config.valProp;
+
   const creators = {} as Creators<Record, any>
   for (const tag in record) {
     creators[tag] = (value: any) =>
