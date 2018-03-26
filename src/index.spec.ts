@@ -135,3 +135,46 @@ describe('separate', () => {
     expect(bar.blam).toBe(3)
   })
 })
+
+
+describe('update suite', () => {
+  const Paylod = unionize({
+    num: ofType<number>(),
+    str: ofType<string>(),
+  }, { valProp:'payload' })
+  
+  it('skips unmet cases', () => {
+    const num = Paylod.num(1);
+    expect(Paylod.update(num, {str: s => s + '?'})).toBe(num)
+    expect(Paylod.update({str: s => s + '??'})(num)).toBe(num)
+  })
+  
+  it('updates with met cases', () => {
+    const str = Paylod.str('hi')
+    const exclaim = (s: string)=> s + '!'
+    const exclaimed = Paylod.str('hi!')
+    expect(Paylod.update({str: exclaim})(str)).toEqual(exclaimed)
+    expect(Paylod.update(str, {str: exclaim})).toEqual(exclaimed)
+  })
+  
+  it('updates immutably by partial state', () => {
+    const Data = unionize({
+      A: ofType<{a: 'not used'}>(),
+      BC: ofType<{b: number, c: string}>()
+    })
+
+    const bc = Object.freeze(Data.BC({b: 1, c: 'hi'}))
+    const expected = Data.BC({b: 1, c: 'hi!'})
+    expect(Data.update({BC: ({c}) => ({c: c + '!'})})(bc)).toEqual(expected)
+    expect(Data.update(bc, {BC: ({c}) => ({c: c + '!'})})).toEqual(expected)
+  })
+
+  it('still updated even with valProp', () => {
+    const Data = unionize({BC: ofType<{b: number, c: string}>()}, {valProp: 'payload'})
+
+    const bc = Object.freeze(Data.BC({b: 1, c: 'hi'}))
+    const expected = Data.BC({b: 1, c: 'hi!'})
+    expect(Data.update({BC: ({c}) => ({c: c + '!'})})(bc)).toEqual(expected)
+    expect(Data.update(bc, {BC: ({c}) => ({c: c + '!'})})).toEqual(expected)
+  })
+})

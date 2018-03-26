@@ -5,6 +5,7 @@ export type Unionized<Record, TaggedRecord> = {
   is: Predicates<TaggedRecord>
   as: Casts<Record, TaggedRecord>
   match: Match<Record, TaggedRecord>
+  update: Update<Record, TaggedRecord>
 } & Creators<Record, TaggedRecord>
 
 export type Creators<Record, TaggedRecord> = {
@@ -27,7 +28,7 @@ export type MatchCases<Record, TaggedRecord, A> =
   | Cases<Record, A>
   | (Partial<Cases<Record, A>> &
     {default: (variant: TaggedRecord[keyof TaggedRecord]) => A})
-
+    
 export type Match<Record, TaggedRecord> = {
   <A>(
     cases: MatchCases<Record, TaggedRecord, A>
@@ -38,6 +39,20 @@ export type Match<Record, TaggedRecord> = {
   ): A
 }
 
+export type UpdateCases<Record, TaggedRecord> = Partial<{
+  [T in keyof Record]: (value: Record[T]) => Partial<Record[T]>
+}>
+
+export type Update<Record, TaggedRecord> = {
+  (
+    cases: UpdateCases<Record, TaggedRecord>
+  ): (variant: TaggedRecord[keyof TaggedRecord]) => TaggedRecord[keyof TaggedRecord]
+  (
+    variant: TaggedRecord[keyof TaggedRecord],
+    cases: UpdateCases<Record, TaggedRecord>
+  ): TaggedRecord[keyof TaggedRecord]
+}
+    
 export type MultiValueVariants<Record extends DictRecord, TagProp extends string> = {
   [T in keyof Record]: { [_ in TagProp]: T } & Record[T]
 }
@@ -85,6 +100,19 @@ export function unionize<Record>(record: Record, config?: { valProp?: string, ta
     is[tag] = ((variant: any) => variant[tagProp] === tag) as any
   }
 
+  const payload = (variant: any)=> valProp? variant[valProp]: variant
+  
+  const evalMatch = (cases: any, variant: any): any => {
+    const k = variant[tagProp]
+    return k in cases
+    ? cases[k](payload(variant))
+    // here we can have '"undefined is not a function". Is it worth checking?
+    // it is <impossible> to get in ts but totally fine in js land
+    : cases.default(variant)
+  }
+  
+  const match = pseudoCurry(evalMatch);
+  
   const as = {} as Casts<Record, any>
   for (const expectedTag in record) {
     as[expectedTag] = match(
@@ -97,31 +125,36 @@ export function unionize<Record>(record: Record, config?: { valProp?: string, ta
     )
   }
 
-  const evaluateMatch = (cases: any, variant: any): any => {
-    const k = variant[tagProp]
+  const evalUpd = (cases: any, variant: any): any => {
+    const k = variant[tagProp];
     return k in cases
-      ? cases[k](valProp ? variant[valProp] : variant)
-      // here we can have '"undefined is not a function". Is it worth checking?
-      // it is <impossible> to get in ts but totally fine in js land
-      : cases.default(variant)
+    ? creators[k](immutableUpd(payload(variant), cases[k](payload(variant))))
+    : variant;
   }
-
-  function match(...args: any[]): any {
-    if (args.length == 1) {
-      const [cases] = args;
-      return (variant: any) => evaluateMatch(cases, variant)
-    }
   
-    const [variant, cases] = args;
-    return evaluateMatch(cases, variant)
-  }
-
   return Object.assign({
     is,
     as,
     match,
+    update: pseudoCurry(evalUpd)
   }, creators)
 }
+
+function pseudoCurry(evalFunc : (cases: any, variant: any) => any ): any {
+  return function(casesOrVal: any, casesOrNone: any)
+  {
+    if (arguments.length == 1) {
+      return (variant: any) => evalFunc(casesOrVal /*cases*/, variant)
+    }
+    
+    return evalFunc(casesOrNone /*cases*/, casesOrVal /*variant*/)
+  }
+}
+
+// todo fix me
+const objType = Object.prototype.toString.call({})
+const isObject = (maybeObj: any) => Object.prototype.toString.call(maybeObj) === objType
+const immutableUpd = (old: any, updated: any) => isObject(old) ? Object.assign({}, old, updated) : updated;
 
 /**
  * Creates a pseudo-witness of a given type. That is, it pretends to return a value of
